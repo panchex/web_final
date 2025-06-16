@@ -48,10 +48,28 @@ export function OrdenesPage() {
   const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 20;
 
-  // Cargar estadísticas al montar el componente
+  // Cargar estadísticas y órdenes iniciales al montar el componente
   useEffect(() => {
-    loadStats();
+    loadInitialData();
   }, []);
+
+  // Cargar datos iniciales
+  const loadInitialData = async () => {
+    // Cargar estadísticas (sin mostrar error si falla)
+    try {
+      const statsData = await OrdenService.getStats();
+      setStats(statsData);
+    } catch (error) {
+      console.error('Error loading stats:', error);
+      // No mostrar toast de error para estadísticas, usar valores por defecto
+    }
+
+    // Cargar órdenes pendientes y en proceso automáticamente
+    const initialFilters = { estado: 'pendiente,en_proceso' };
+    setFilters(initialFilters);
+    setActiveFilter('pendiente,en_proceso');
+    loadOrdenes(initialFilters, 1);
+  };
 
   // Cargar estadísticas
   const loadStats = async () => {
@@ -60,7 +78,7 @@ export function OrdenesPage() {
       setStats(statsData);
     } catch (error) {
       console.error('Error loading stats:', error);
-      toast.error('Error al cargar estadísticas');
+      // No mostrar error, mantener estadísticas actuales
     }
   };
 
@@ -78,7 +96,10 @@ export function OrdenesPage() {
       const response = await OrdenService.getOrdenes(newFilters, { page, per_page: itemsPerPage });
       
       setOrdenes(response.data.ordenes);
-      setStats(response.data.stats);
+      // Actualizar estadísticas si vienen en la respuesta
+      if (response.data.stats) {
+        setStats(response.data.stats);
+      }
       setCurrentPage(response.data.pagination.current_page);
       setTotalPages(response.data.pagination.total_pages);
       setTotalItems(response.data.pagination.total);
@@ -87,6 +108,7 @@ export function OrdenesPage() {
       console.error('Error loading ordenes:', error);
       toast.error(error.message || 'Error al cargar órdenes');
       setOrdenes([]);
+      setHasSearched(false);
     } finally {
       setLoading(false);
     }
@@ -116,6 +138,26 @@ export function OrdenesPage() {
     setFilters(newFilters);
     setCurrentPage(1);
     loadOrdenes(newFilters, 1);
+  };
+
+  // Limpiar filtros y volver al estado inicial
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setActiveFilter('');
+    setFilters({});
+    setOrdenes([]);
+    setHasSearched(false);
+    setCurrentPage(1);
+  };
+
+  // Cargar filtro inicial (pendientes + en proceso)
+  const handleLoadInitialFilter = () => {
+    const initialFilters = { estado: 'pendiente,en_proceso' };
+    setFilters(initialFilters);
+    setActiveFilter('pendiente,en_proceso');
+    setSearchTerm('');
+    setCurrentPage(1);
+    loadOrdenes(initialFilters, 1);
   };
 
   // Manejar paginación
@@ -276,44 +318,68 @@ export function OrdenesPage() {
             />
           </div>
 
-          {/* Filtros por Estado */}
-          <div className="flex flex-wrap gap-2">
-            <span className="flex items-center text-sm font-medium text-gray-700 mr-2">
-              <Filter className="w-4 h-4 mr-1" />
-              Filtrar por estado:
-            </span>
-            {[
-              { key: 'pendiente', label: 'Pendientes', count: stats.pendientes, color: 'yellow' },
-              { key: 'en_proceso', label: 'En Proceso', count: stats.en_proceso, color: 'blue' },
-              { key: 'completada', label: 'Completadas', count: stats.completadas, color: 'green' },
-              { key: 'cancelada', label: 'Canceladas', count: stats.canceladas, color: 'red' }
-            ].map((filter) => (
-              <button
-                key={filter.key}
-                onClick={() => handleFilterByEstado(filter.key)}
-                className={`px-3 py-1 text-sm font-medium rounded-full transition-colors ${
-                  activeFilter === filter.key
-                    ? `text-${filter.color}-700 bg-${filter.color}-100 border-${filter.color}-300 border`
-                    : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
-                }`}
-              >
-                {filter.label} ({filter.count})
-              </button>
-            ))}
-          </div>
+                     {/* Filtros por Estado */}
+           <div className="flex flex-wrap gap-2">
+             <span className="flex items-center text-sm font-medium text-gray-700 mr-2">
+               <Filter className="w-4 h-4 mr-1" />
+               Filtros rápidos:
+             </span>
+             
+             {/* Filtro combinado inicial */}
+             <button
+               onClick={handleLoadInitialFilter}
+               className={`px-3 py-1 text-sm font-medium rounded-full transition-colors ${
+                 activeFilter === 'pendiente,en_proceso'
+                   ? 'text-blue-700 bg-blue-100 border-blue-300 border'
+                   : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
+               }`}
+             >
+               Activas ({stats.pendientes + stats.en_proceso})
+             </button>
 
-          {/* Mensaje de filtros obligatorios */}
-          {!hasSearched && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start space-x-3">
-                <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="text-sm text-blue-700">
-                  <p className="font-medium mb-1">Búsqueda requerida</p>
-                  <p>Para ver las órdenes, utiliza la búsqueda o selecciona un filtro por estado.</p>
-                </div>
-              </div>
-            </div>
-          )}
+             {/* Filtros individuales */}
+             {[
+               { key: 'pendiente', label: 'Pendientes', count: stats.pendientes, color: 'yellow' },
+               { key: 'en_proceso', label: 'En Proceso', count: stats.en_proceso, color: 'blue' },
+               { key: 'completada', label: 'Completadas', count: stats.completadas, color: 'green' },
+               { key: 'cancelada', label: 'Canceladas', count: stats.canceladas, color: 'red' }
+             ].map((filter) => (
+               <button
+                 key={filter.key}
+                 onClick={() => handleFilterByEstado(filter.key)}
+                 className={`px-3 py-1 text-sm font-medium rounded-full transition-colors ${
+                   activeFilter === filter.key
+                     ? `text-${filter.color}-700 bg-${filter.color}-100 border-${filter.color}-300 border`
+                     : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
+                 }`}
+               >
+                 {filter.label} ({filter.count})
+               </button>
+             ))}
+
+             {/* Botón limpiar */}
+             {(hasSearched || searchTerm) && (
+               <button
+                 onClick={handleClearFilters}
+                 className="px-3 py-1 text-sm font-medium text-red-600 bg-red-50 rounded-full hover:bg-red-100 transition-colors"
+               >
+                 Limpiar
+               </button>
+             )}
+           </div>
+
+                     {/* Mensaje informativo */}
+           {!hasSearched && !loading && (
+             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+               <div className="flex items-start space-x-3">
+                 <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                 <div className="text-sm text-blue-700">
+                   <p className="font-medium mb-1">¡Bienvenido a Órdenes de Trabajo!</p>
+                   <p>Las órdenes activas se cargan automáticamente. Usa la búsqueda o filtros para encontrar órdenes específicas.</p>
+                 </div>
+               </div>
+             </div>
+           )}
         </div>
       </div>
 

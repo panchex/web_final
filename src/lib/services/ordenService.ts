@@ -170,6 +170,11 @@ export class OrdenService {
     );
   }
 
+  // Validar si es filtro de múltiples estados
+  static isMultipleStatesFilter(estado: string): boolean {
+    return estado.includes(',');
+  }
+
   // Formatear número de orden
   static formatNumeroOrden(numero: string): string {
     return numero.startsWith('OT-') ? numero : `OT-${numero}`;
