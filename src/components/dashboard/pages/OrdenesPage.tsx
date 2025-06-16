@@ -282,9 +282,9 @@ export function OrdenesPage() {
                 <span className="text-xs font-medium">Conectado</span>
               </div>
             ) : (
-              <div className="flex items-center space-x-1 text-red-600">
+              <div className="flex items-center space-x-1 text-orange-600">
                 <WifiOff className="w-4 h-4" />
-                <span className="text-xs font-medium">Sin conexión</span>
+                <span className="text-xs font-medium">Modo Demo</span>
               </div>
             )}
           </div>
@@ -430,16 +430,14 @@ export function OrdenesPage() {
           ) : ordenes.length === 0 ? (
             <div className="text-center py-12">
               <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {stats.total === 0 ? 'Backend no disponible' : 'No se encontraron órdenes'}
-              </h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron órdenes</h3>
               <p className="text-gray-600">
-                {stats.total === 0 
-                  ? 'No se puede conectar con el servidor. Verifica que el backend esté funcionando.'
+                {!backendConnected 
+                  ? 'Usando datos de demostración. Intenta ajustar los filtros de búsqueda.'
                   : 'Intenta ajustar los filtros de búsqueda'
                 }
               </p>
-              {stats.total === 0 && (
+              {!backendConnected && (
                 <button
                   onClick={loadInitialData}
                   className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
