@@ -14,7 +14,9 @@ import {
   Wrench,
   User,
   Filter,
-  RefreshCw
+  RefreshCw,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { useDashboardStore } from '@/lib/stores/dashboard-store';
 import { OrdenService } from '@/lib/services/ordenService';
@@ -36,6 +38,7 @@ export function OrdenesPage() {
   });
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [backendConnected, setBackendConnected] = useState(true);
   
   // Estados de filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -59,16 +62,34 @@ export function OrdenesPage() {
     try {
       const statsData = await OrdenService.getStats();
       setStats(statsData);
+      setBackendConnected(true);
     } catch (error) {
       console.error('Error loading stats:', error);
-      // No mostrar toast de error para estadísticas, usar valores por defecto
+      setBackendConnected(false);
+      // Usar estadísticas mock si el backend no está disponible
+      setStats({
+        total: 0,
+        pendientes: 0,
+        en_proceso: 0,
+        completadas: 0,
+        canceladas: 0,
+        urgentes: 0
+      });
     }
 
     // Cargar órdenes pendientes y en proceso automáticamente
     const initialFilters = { estado: 'pendiente,en_proceso' };
     setFilters(initialFilters);
     setActiveFilter('pendiente,en_proceso');
-    loadOrdenes(initialFilters, 1);
+    
+    // Intentar cargar órdenes, si falla mostrar mensaje informativo
+    try {
+      await loadOrdenes(initialFilters, 1);
+    } catch (error) {
+      console.error('Error loading initial orders:', error);
+      setHasSearched(true); // Para mostrar el mensaje de "no hay órdenes"
+      setLoading(false);
+    }
   };
 
   // Cargar estadísticas
@@ -253,7 +274,20 @@ export function OrdenesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Órdenes de Trabajo</h1>
+          <div className="flex items-center space-x-3">
+            <h1 className="text-2xl font-bold text-gray-900">Órdenes de Trabajo</h1>
+            {backendConnected ? (
+              <div className="flex items-center space-x-1 text-green-600">
+                <Wifi className="w-4 h-4" />
+                <span className="text-xs font-medium">Conectado</span>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-1 text-red-600">
+                <WifiOff className="w-4 h-4" />
+                <span className="text-xs font-medium">Sin conexión</span>
+              </div>
+            )}
+          </div>
           <p className="text-gray-600">Gestiona las órdenes de reparación y mantenimiento</p>
         </div>
         <div className="flex items-center space-x-3">
@@ -396,8 +430,23 @@ export function OrdenesPage() {
           ) : ordenes.length === 0 ? (
             <div className="text-center py-12">
               <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron órdenes</h3>
-              <p className="text-gray-600">Intenta ajustar los filtros de búsqueda</p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {stats.total === 0 ? 'Backend no disponible' : 'No se encontraron órdenes'}
+              </h3>
+              <p className="text-gray-600">
+                {stats.total === 0 
+                  ? 'No se puede conectar con el servidor. Verifica que el backend esté funcionando.'
+                  : 'Intenta ajustar los filtros de búsqueda'
+                }
+              </p>
+              {stats.total === 0 && (
+                <button
+                  onClick={loadInitialData}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Reintentar conexión
+                </button>
+              )}
             </div>
           ) : (
             <>
